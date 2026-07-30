@@ -398,7 +398,7 @@ export default function DashboardClient({ rows }) {
     <div className="max-w-[1180px] mx-auto px-5 py-6 pb-20 w-full">
       <div className="flex items-start justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-[22px] font-semibold mb-1">Sales Agent Red Team Dashboard</h1>
+          <h1 className="text-[22px] font-semibold mb-1">🚀 Rocket Red Teaming Dashboard</h1>
           <p className="text-[13.5px] text-[var(--text-secondary)]">
             {total} conversation{total === 1 ? "" : "s"} loaded from data/
           </p>

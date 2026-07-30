@@ -1,8 +1,8 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "Sales Agent Red Team Dashboard",
-  description: "Visualizing red-team conversations against the sales agent",
+  title: "Rocket Red Teaming Dashboard",
+  description: "Dashboard for visualizing results of red teaming conversations with Sales Agent",
 };
 
 export default function RootLayout({ children }) {
