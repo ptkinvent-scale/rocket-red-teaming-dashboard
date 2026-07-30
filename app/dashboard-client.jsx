@@ -1,17 +1,41 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { ChevronRight, Moon, Sun } from "lucide-react";
 
-const CATEGORICAL_SLOTS = [
-  "var(--slot-1)",
-  "var(--slot-2)",
-  "var(--slot-3)",
-  "var(--slot-4)",
-  "var(--slot-5)",
-  "var(--slot-6)",
-  "var(--slot-7)",
-  "var(--slot-8)",
-];
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+
+const STATUS_COLOR = {
+  good: "var(--good)",
+  warning: "var(--warning)",
+  critical: "var(--critical)",
+  muted: "var(--muted-foreground)",
+};
+
+const STATUS_VARIANT = {
+  good: "secondary",
+  warning: "outline",
+  critical: "destructive",
+  muted: "outline",
+};
+
+const STATUS_CLASS = {
+  good: "border-transparent bg-[var(--good)]/10 text-[var(--good)]",
+  warning: "border-transparent bg-[var(--warning)]/10 text-[var(--warning)]",
+};
+
+const SORT_LABELS = {
+  timestamp_desc: "Newest first",
+  timestamp_asc: "Oldest first",
+  violations_first: "Violations first",
+  tracking_id: "Tracking ID",
+};
 
 function statusForVerdict(v) {
   if (/no_?violation|non.?violat|pass|clean/i.test(v)) return "good";
@@ -22,37 +46,37 @@ function statusForVerdict(v) {
 function statusForSeverity(s) {
   const norm = (s || "none").toLowerCase();
   if (norm === "none" || norm === "null") return "muted";
-  if (norm === "low") return "good";
-  if (norm === "medium" || norm === "moderate") return "warning";
-  if (norm === "high") return "serious";
-  if (norm === "critical" || norm === "severe") return "critical";
   return "warning";
 }
 
-const STATUS_TEXT = {
-  good: "text-[var(--good)]",
-  warning: "text-[#9a6a00]",
-  serious: "text-[#a0431e]",
-  critical: "text-[var(--critical)]",
-  muted: "text-[var(--text-muted)]",
+const SEVERITY_COLOR = {
+  low: "var(--sev-low)",
+  mild: "var(--sev-mild)",
+  severe: "var(--sev-severe)",
 };
 
-const STATUS_BG = {
-  good: "bg-[color-mix(in_srgb,var(--good)_14%,transparent)]",
-  warning: "bg-[color-mix(in_srgb,var(--warning)_22%,transparent)]",
-  serious: "bg-[color-mix(in_srgb,var(--serious)_20%,transparent)]",
-  critical: "bg-[color-mix(in_srgb,var(--critical)_14%,transparent)]",
-  muted: "bg-[var(--gridline)]",
-};
+function severityColor(severity) {
+  return SEVERITY_COLOR[(severity || "").toLowerCase()] ?? "var(--warning)";
+}
 
-function Badge({ status, children }) {
+function StatusBadge({ status, children }) {
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold whitespace-nowrap ${STATUS_TEXT[status]} ${STATUS_BG[status]}`}
-    >
-      <span className="w-1.5 h-1.5 rounded-full" style={{ background: "currentColor" }} />
+    <Badge variant={STATUS_VARIANT[status]} className={STATUS_CLASS[status]}>
       {children}
-    </span>
+    </Badge>
+  );
+}
+
+function SeverityBadge({ severity, children }) {
+  const color = severityColor(severity);
+  return (
+    <Badge
+      variant="outline"
+      className="border-transparent"
+      style={{ color, backgroundColor: `color-mix(in srgb, ${color} 14%, transparent)` }}
+    >
+      {children}
+    </Badge>
   );
 }
 
@@ -77,18 +101,27 @@ function fmtDate(ts) {
   });
 }
 
+function fmtShortDateTime(ts) {
+  if (!ts) return null;
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return null;
+  let hours = d.getHours();
+  const minutes = d.getMinutes().toString().padStart(2, "0");
+  const ampm = hours >= 12 ? "pm" : "am";
+  hours = hours % 12 || 12;
+  return `${d.getMonth() + 1}/${d.getDate()} ${hours}:${minutes}${ampm}`;
+}
+
 function StatTile({ label, value, tone }) {
   const toneClass =
-    tone === "critical"
-      ? "text-[var(--critical)]"
-      : tone === "good"
-        ? "text-[var(--good)]"
-        : "text-[var(--text-primary)]";
+    tone === "critical" ? "text-destructive" : tone === "good" ? "text-[var(--good)]" : "text-foreground";
   return (
-    <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-xl px-4 py-3.5">
-      <div className="text-xs text-[var(--text-secondary)] mb-1.5">{label}</div>
-      <div className={`text-2xl font-semibold ${toneClass}`}>{value}</div>
-    </div>
+    <Card>
+      <CardContent>
+        <div className="text-sm text-muted-foreground mb-1.5">{label}</div>
+        <div className={`text-2xl font-semibold ${toneClass}`}>{value}</div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -98,139 +131,117 @@ function BarChart({ title, data, colorFor }) {
   const sorted = [...data].sort((a, b) => b.value - a.value);
 
   return (
-    <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-xl p-4">
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-[13px] font-semibold">{title}</span>
-        <button
-          onClick={() => setView(view === "chart" ? "table" : "chart")}
-          className="text-[11px] text-[var(--text-secondary)] border border-[var(--border)] rounded-md px-2 py-0.5 hover:text-[var(--text-primary)]"
-        >
-          {view === "chart" ? "Show table" : "Show chart"}
-        </button>
-      </div>
+    <Card>
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+        <CardAction>
+          <Button variant="outline" onClick={() => setView(view === "chart" ? "table" : "chart")}>
+            {view === "chart" ? "Show table" : "Show chart"}
+          </Button>
+        </CardAction>
+      </CardHeader>
 
-      {view === "chart" ? (
-        <div className="space-y-1">
-          {sorted.map((d) => (
-            <div
-              key={d.label}
-              className="grid grid-cols-[100px_1fr_36px] items-center gap-2 min-h-[26px]"
-              title={`${d.label}: ${d.value}`}
-            >
-              <div className="text-xs text-[var(--text-secondary)] text-right truncate">{d.label}</div>
-              <div className="relative h-4 bg-[var(--gridline)] rounded overflow-hidden">
-                <div
-                  className="absolute inset-y-0 left-0 rounded"
-                  style={{ width: `${Math.round((d.value / max) * 100)}%`, background: colorFor(d.label) }}
-                />
-              </div>
-              <div className="text-xs text-[var(--text-secondary)] tabular-nums">{d.value}</div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <table className="w-full text-[12.5px]">
-          <thead>
-            <tr className="text-[var(--text-muted)]">
-              <th className="text-left font-medium border-b border-[var(--gridline)] py-1">Label</th>
-              <th className="text-right font-medium border-b border-[var(--gridline)] py-1">Count</th>
-            </tr>
-          </thead>
-          <tbody>
+      <CardContent>
+        {view === "chart" ? (
+          <div className="space-y-2">
             {sorted.map((d) => (
-              <tr key={d.label}>
-                <td className="py-1 border-b border-[var(--gridline)] text-[var(--text-secondary)]">{d.label}</td>
-                <td className="py-1 border-b border-[var(--gridline)] text-right tabular-nums text-[var(--text-secondary)]">
-                  {d.value}
-                </td>
-              </tr>
+              <div
+                key={d.label}
+                className="grid grid-cols-[100px_1fr_36px] items-center gap-3 min-h-[28px]"
+                title={`${d.label}: ${d.value}`}
+              >
+                <div className="text-sm text-muted-foreground text-right truncate">{d.label}</div>
+                <div className="relative h-4 bg-muted rounded overflow-hidden">
+                  <div
+                    className="absolute inset-y-0 left-0 rounded"
+                    style={{ width: `${Math.round((d.value / max) * 100)}%`, background: colorFor(d.label) }}
+                  />
+                </div>
+                <div className="text-sm text-muted-foreground tabular-nums">{d.value}</div>
+              </div>
             ))}
-          </tbody>
-        </table>
-      )}
-    </div>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Label</TableHead>
+                <TableHead className="text-right">Count</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sorted.map((d) => (
+                <TableRow key={d.label}>
+                  <TableCell>{d.label}</TableCell>
+                  <TableCell className="text-right tabular-nums">{d.value}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
-function ConversationCard({ row, expanded, onToggle, categoryColor }) {
+function ConversationCard({ row, expanded, onToggle }) {
   const verdictStatus = statusForVerdict(row.verdict);
   const severityStatus = statusForSeverity(row.severity);
   const preview = row.clientInbound.replace(/\s+/g, " ").slice(0, 140);
-  const evalTone =
-    verdictStatus === "critical"
-      ? "bg-[color-mix(in_srgb,var(--critical)_8%,var(--surface-1))] border-[color-mix(in_srgb,var(--critical)_30%,var(--border))]"
-      : verdictStatus === "good"
-        ? "bg-[color-mix(in_srgb,var(--good)_8%,var(--surface-1))] border-[color-mix(in_srgb,var(--good)_30%,var(--border))]"
-        : "bg-[var(--gridline)] border-[var(--border)]";
 
   return (
-    <div className="bg-[var(--surface-1)] border border-[var(--border)] rounded-xl mb-2.5 overflow-hidden">
-      <button
-        onClick={onToggle}
-        className="w-full flex items-center gap-2.5 px-3.5 py-3 flex-wrap text-left hover:bg-[color-mix(in_srgb,var(--text-primary)_3%,transparent)]"
-      >
-        <span className="text-xs font-semibold min-w-[52px] uppercase">{row.trackingId}</span>
-        <Badge status={verdictStatus}>{row.verdict}</Badge>
-        {row.severity !== "none" && <Badge status={severityStatus}>{row.severity}</Badge>}
-        <span
-          className="text-[11px] font-semibold rounded-full px-2.5 py-0.5 bg-[var(--gridline)]"
-          style={{ color: categoryColor }}
-        >
-          {row.category}
-        </span>
-        <span className="text-[12.5px] text-[var(--text-secondary)] flex-1 min-w-[140px]">
-          {row.clientName}
-          {row.state ? ` · ${row.state}` : ""}
-        </span>
-        <span className="text-xs text-[var(--text-muted)] flex-[2] min-w-[200px] truncate">{preview}</span>
-        <span
-          className={`text-[11px] text-[var(--text-muted)] ml-auto transition-transform ${expanded ? "rotate-90" : ""}`}
-        >
-          ▶
-        </span>
-      </button>
+    <Card className="mb-4 gap-0 overflow-hidden py-0">
+      <Collapsible open={expanded} onOpenChange={onToggle}>
+        <CollapsibleTrigger className="w-full flex items-center gap-3 p-4 flex-wrap text-left hover:bg-muted/50">
+          <span className="text-sm font-semibold min-w-[52px] uppercase">{row.trackingId}</span>
+          {row.severity === "none" ? (
+            <StatusBadge status={verdictStatus}>{`${row.verdict}`}</StatusBadge>
+          ) : (
+            <SeverityBadge severity={row.severity}>{`${row.severity}_${row.verdict}`}</SeverityBadge>
+          )}
+          <Badge variant="secondary">{row.category}</Badge>
+          <span className="text-sm text-muted-foreground flex-1 min-w-[140px]">
+            {row.clientName}
+            {row.state ? ` · ${row.state}` : ""}
+          </span>
+          <span className="text-sm text-muted-foreground flex-[2] min-w-[200px] truncate">{preview}</span>
+          <ChevronRight
+            className={`size-4 text-muted-foreground ml-auto transition-transform ${expanded ? "rotate-90" : ""}`}
+          />
+        </CollapsibleTrigger>
 
-      {expanded && (
-        <div className="px-4 pb-4 pt-1 border-t border-[var(--gridline)]">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 my-3.5">
+        <CollapsibleContent className="p-4 pt-0 border-t">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 my-4">
             <div>
-              <h4 className="text-[11px] uppercase tracking-wide text-[var(--text-muted)] font-semibold mb-1.5">
-                Client
-              </h4>
+              <h4 className="text-sm text-muted-foreground font-medium mb-2">Client</h4>
               <KV k="Name" v={row.clientName} />
               <KV k="State" v={row.state || "—"} />
               <KV k="Occupancy" v={row.occupancy || "—"} />
               <KV k="Banker" v={row.bankerName} />
             </div>
             <div>
-              <h4 className="text-[11px] uppercase tracking-wide text-[var(--text-muted)] font-semibold mb-1.5">
-                Loan
-              </h4>
+              <h4 className="text-sm text-muted-foreground font-medium mb-2">Loan</h4>
               <KV k="Product" v={row.product || "—"} />
               <KV k="Purpose" v={row.purpose || "—"} />
               <KV k="Current rate" v={fmtPct(row.currentRate)} />
               <KV k="Target rate" v={fmtPct(row.targetRate)} />
             </div>
             <div>
-              <h4 className="text-[11px] uppercase tracking-wide text-[var(--text-muted)] font-semibold mb-1.5">
-                Balance
-              </h4>
+              <h4 className="text-sm text-muted-foreground font-medium mb-2">Balance</h4>
               <KV k="Unpaid balance" v={fmtMoney(row.unpaidBalance)} />
               <KV k="P&I" v={fmtMoney(row.pAndI)} />
               <KV k="Est. equity" v={fmtMoney(row.equity)} />
               <KV k="PMI" v={row.hasMI ? fmtMoney(row.miAmount) + "/mo" : "None"} />
             </div>
             <div>
-              <h4 className="text-[11px] uppercase tracking-wide text-[var(--text-muted)] font-semibold mb-1.5">
-                Meta
-              </h4>
+              <h4 className="text-sm text-muted-foreground font-medium mb-2">Meta</h4>
               <KV k="Category" v={row.category} />
               <KV k="Subcategory" v={row.subcategory || "—"} />
               <KV k="Timestamp" v={fmtDate(row.timestamp)} />
             </div>
           </div>
 
-          <div className="flex flex-col gap-2.5 my-3.5">
+          <div className="flex flex-col gap-3 my-4">
             {row.bankerOutreach && (
               <ChatBubble
                 align="left"
@@ -253,11 +264,11 @@ function ConversationCard({ row, expanded, onToggle, categoryColor }) {
           </div>
 
           {(row.reasonText || row.strategyText) && (
-            <details className="mt-2.5">
-              <summary className="cursor-pointer text-xs text-[var(--text-muted)]">
+            <details className="mt-3">
+              <summary className="cursor-pointer text-sm text-muted-foreground">
                 NBA directive (intended strategy)
               </summary>
-              <div className="msg-text text-[12.5px] text-[var(--text-secondary)] mt-2 leading-relaxed">
+              <div className="msg-text text-sm text-muted-foreground mt-2 leading-relaxed">
                 {row.reasonText}
                 {row.reasonText && row.strategyText ? "\n\n" : ""}
                 {row.strategyText}
@@ -265,44 +276,43 @@ function ConversationCard({ row, expanded, onToggle, categoryColor }) {
             </details>
           )}
 
-          <div className={`rounded-lg px-3 py-2.5 mt-3.5 border ${evalTone}`}>
-            <div className="flex gap-2 items-center mb-1.5">
-              <Badge status={verdictStatus}>{row.verdict}</Badge>
-              {row.severity !== "none" && <Badge status={severityStatus}>severity: {row.severity}</Badge>}
-            </div>
-            <div className="text-[13px]">{row.comment || "No comment provided."}</div>
-          </div>
+          <Card className={row.isViolation ? "mt-4 border-destructive/40 bg-destructive/5" : "mt-4 bg-muted/40"}>
+            <CardContent>
+              <div className="flex gap-2 items-center mb-2 flex-wrap">
+                <StatusBadge status={verdictStatus}>{row.verdict}</StatusBadge>
+                {row.severity !== "none" && <StatusBadge status={severityStatus}>severity: {row.severity}</StatusBadge>}
+              </div>
+              <div className="text-sm">{row.comment || "No comment provided."}</div>
+            </CardContent>
+          </Card>
 
-          <div className="text-[10.5px] text-[var(--text-muted)] mt-2.5">
+          <div className="text-sm text-muted-foreground mt-3">
             Source: {row.sourceFile} · ID: {row.id}
           </div>
-        </div>
-      )}
-    </div>
+        </CollapsibleContent>
+      </Collapsible>
+    </Card>
   );
 }
 
 function KV({ k, v }) {
   return (
-    <div className="flex justify-between text-[12.5px] py-0.5 text-[var(--text-secondary)]">
+    <div className="flex justify-between text-sm py-1 text-muted-foreground">
       <span>{k}</span>
-      <span className="text-[var(--text-primary)] tabular-nums text-right">{v}</span>
+      <span className="text-foreground tabular-nums text-right">{v}</span>
     </div>
   );
 }
 
 function ChatBubble({ align, name, text, tone }) {
   const isRight = align === "right";
-  const toneClass =
-    tone === "client"
-      ? "bg-[color-mix(in_srgb,var(--slot-2)_12%,var(--surface-1))] border-[color-mix(in_srgb,var(--slot-2)_30%,var(--border))]"
-      : "bg-[color-mix(in_srgb,var(--slot-1)_10%,var(--surface-1))] border-[color-mix(in_srgb,var(--slot-1)_28%,var(--border))]";
+  const toneClass = tone === "client" ? "bg-secondary text-secondary-foreground" : "bg-muted text-foreground";
 
   return (
     <div className={`flex flex-col max-w-[80%] ${isRight ? "self-end items-end" : "self-start items-start"}`}>
-      <span className="text-[10.5px] text-[var(--text-muted)] font-semibold mb-1 px-1">{name}</span>
+      <span className="text-sm text-muted-foreground font-medium mb-1 px-1">{name}</span>
       <div
-        className={`rounded-2xl px-3.5 py-2.5 border text-[13px] leading-relaxed msg-text ${toneClass} ${
+        className={`rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed msg-text ${toneClass} ${
           isRight ? "rounded-tr-sm" : "rounded-tl-sm"
         }`}
       >
@@ -312,23 +322,13 @@ function ChatBubble({ align, name, text, tone }) {
   );
 }
 
-export default function DashboardClient({ rows }) {
+export default function DashboardClient({ rows, buildTime }) {
   const [search, setSearch] = useState("");
   const [verdictFilter, setVerdictFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [severityFilter, setSeverityFilter] = useState("all");
   const [sort, setSort] = useState("timestamp_desc");
   const [expanded, setExpanded] = useState(new Set());
-
-  const categoryColorMap = useMemo(() => {
-    const order = [];
-    for (const r of rows) if (!order.includes(r.category)) order.push(r.category);
-    const map = {};
-    order.forEach((val, i) => {
-      map[val] = i < CATEGORICAL_SLOTS.length ? CATEGORICAL_SLOTS[i] : "var(--text-muted)";
-    });
-    return map;
-  }, [rows]);
 
   const uniqueVerdicts = useMemo(() => [...new Set(rows.map((r) => r.verdict))].sort(), [rows]);
   const uniqueCategories = useMemo(() => [...new Set(rows.map((r) => r.category))].sort(), [rows]);
@@ -395,139 +395,130 @@ export default function DashboardClient({ rows }) {
   const rate = total ? ((violations / total) * 100).toFixed(1) + "%" : "—";
 
   return (
-    <div className="max-w-[1180px] mx-auto px-5 py-6 pb-20 w-full">
-      <div className="flex items-start justify-between gap-4 mb-6">
+    <div className="max-w-[1180px] mx-auto px-6 py-8 pb-20 w-full">
+      <div className="flex items-start justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-[22px] font-semibold mb-1">🚀 Rocket Red Teaming Dashboard</h1>
-          <p className="text-[13.5px] text-[var(--text-secondary)]">
-            {total} conversation{total === 1 ? "" : "s"} loaded from data/
+          <h1 className="text-2xl font-semibold mb-1">🚀 Rocket Red Teaming Dashboard</h1>
+          <p className="text-sm text-muted-foreground">
+            {total} conversation{total === 1 ? "" : "s"} loaded · Last updated at {fmtShortDateTime(buildTime)}
           </p>
         </div>
         <ThemeToggle />
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         <StatTile label="Total conversations" value={total} />
         <StatTile label="Violations found" value={violations} tone="critical" />
         <StatTile label="No violation" value={noViolations} tone="good" />
         <StatTile label="Violation rate" value={rate} />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <BarChart
           title="Verdict breakdown"
           data={countBy("verdict")}
-          colorFor={(l) => `var(--${statusForVerdict(l)})`}
+          colorFor={(l) => STATUS_COLOR[statusForVerdict(l)]}
         />
-        <BarChart
-          title="Category breakdown"
-          data={countBy("category")}
-          colorFor={(l) => categoryColorMap[l] || "var(--text-muted)"}
-        />
+        <BarChart title="Category breakdown" data={countBy("category")} colorFor={() => "var(--muted-foreground)"} />
         <BarChart
           title="Severity breakdown"
           data={countBy("severity")}
-          colorFor={(l) => `var(--${statusForSeverity(l)})`}
+          colorFor={(l) => {
+            const norm = (l || "none").toLowerCase();
+            if (norm === "none") return "var(--muted-foreground)";
+            if (norm === "severe" || norm === "critical") return "var(--critical)";
+            return severityColor(l);
+          }}
         />
       </div>
 
-      <div className="flex flex-wrap gap-2 items-center bg-[var(--surface-1)] border border-[var(--border)] rounded-xl px-3 py-2.5 mb-4">
-        <input
+      <Card className="flex-row flex-wrap items-center gap-3 mb-6">
+        <Input
           type="search"
           placeholder="Search tracking id, client, message text..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="flex-1 min-w-[160px] text-[12.5px] px-2 py-1.5 rounded-md border border-[var(--border)] bg-[var(--page)] text-[var(--text-primary)]"
+          className="flex-1 min-w-[200px]"
         />
-        <Select value={verdictFilter} onChange={setVerdictFilter} options={uniqueVerdicts} allLabel="All verdicts" />
-        <Select
+        <FilterSelect
+          value={verdictFilter}
+          onChange={setVerdictFilter}
+          options={uniqueVerdicts}
+          allLabel="All verdicts"
+        />
+        <FilterSelect
           value={categoryFilter}
           onChange={setCategoryFilter}
           options={uniqueCategories}
           allLabel="All categories"
         />
-        <Select
+        <FilterSelect
           value={severityFilter}
           onChange={setSeverityFilter}
           options={uniqueSeverities}
           allLabel="All severities"
         />
-        <select
-          value={sort}
-          onChange={(e) => setSort(e.target.value)}
-          className="text-[12.5px] px-2 py-1.5 rounded-md border border-[var(--border)] bg-[var(--page)] text-[var(--text-primary)]"
-        >
-          <option value="timestamp_desc">Newest first</option>
-          <option value="timestamp_asc">Oldest first</option>
-          <option value="violations_first">Violations first</option>
-          <option value="tracking_id">Tracking ID</option>
-        </select>
-        <span className="text-xs text-[var(--text-muted)] ml-auto whitespace-nowrap">
+        <Select value={sort} onValueChange={setSort}>
+          <SelectTrigger>
+            <SelectValue>{(v) => SORT_LABELS[v] ?? v}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="timestamp_desc">Newest first</SelectItem>
+            <SelectItem value="timestamp_asc">Oldest first</SelectItem>
+            <SelectItem value="violations_first">Violations first</SelectItem>
+            <SelectItem value="tracking_id">Tracking ID</SelectItem>
+          </SelectContent>
+        </Select>
+        <span className="text-sm text-muted-foreground ml-auto whitespace-nowrap">
           {filtered.length} of {total} shown
         </span>
-        <button
-          onClick={resetFilters}
-          className="text-xs text-[var(--text-secondary)] border border-[var(--border)] rounded-md px-2.5 py-1.5 hover:text-[var(--text-primary)]"
-        >
+        <Button variant="outline" onClick={resetFilters}>
           Reset
-        </button>
-      </div>
+        </Button>
+      </Card>
 
       {filtered.length === 0 ? (
-        <div className="text-center text-[var(--text-muted)] py-10 px-5 border border-dashed border-[var(--border)] rounded-xl text-[13px]">
+        <div className="text-center text-muted-foreground py-10 px-5 border border-dashed rounded-xl text-sm">
           No conversations match the current filters.
         </div>
       ) : (
         filtered.map((row) => (
-          <ConversationCard
-            key={row.id}
-            row={row}
-            expanded={expanded.has(row.id)}
-            onToggle={() => toggle(row.id)}
-            categoryColor={categoryColorMap[row.category]}
-          />
+          <ConversationCard key={row.id} row={row} expanded={expanded.has(row.id)} onToggle={() => toggle(row.id)} />
         ))
       )}
     </div>
   );
 }
 
-function Select({ value, onChange, options, allLabel }) {
+function FilterSelect({ value, onChange, options, allLabel }) {
   return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="text-[12.5px] px-2 py-1.5 rounded-md border border-[var(--border)] bg-[var(--page)] text-[var(--text-primary)]"
-    >
-      <option value="all">{allLabel}</option>
-      {options.map((o) => (
-        <option key={o} value={o}>
-          {o}
-        </option>
-      ))}
-    </select>
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger>
+        <SelectValue>{(v) => (v === "all" ? allLabel : v)}</SelectValue>
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all">{allLabel}</SelectItem>
+        {options.map((o) => (
+          <SelectItem key={o} value={o}>
+            {o}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 
 function ThemeToggle() {
-  const [theme, setTheme] = useState(null);
-
   function toggle() {
-    const isDark =
-      theme === "dark" ||
-      (theme === null && typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-    const next = isDark ? "light" : "dark";
-    setTheme(next);
-    document.documentElement.setAttribute("data-theme", next);
-    localStorage.setItem("rt-theme", next);
+    const next = !document.documentElement.classList.contains("dark");
+    document.documentElement.classList.toggle("dark", next);
+    localStorage.setItem("rt-theme", next ? "dark" : "light");
   }
 
   return (
-    <button
-      onClick={toggle}
-      className="border border-[var(--border)] bg-[var(--surface-1)] text-[var(--text-secondary)] rounded-lg px-3 py-1.5 text-xs whitespace-nowrap hover:text-[var(--text-primary)]"
-    >
-      Toggle theme
-    </button>
+    <Button variant="outline" size="icon" onClick={toggle} aria-label="Toggle theme">
+      <Sun className="size-4 dark:hidden" />
+      <Moon className="hidden size-4 dark:block" />
+    </Button>
   );
 }

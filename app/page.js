@@ -14,5 +14,5 @@ export default async function Page() {
   }
 
   const rows = getConversations();
-  return <DashboardClient rows={rows} />;
+  return <DashboardClient rows={rows} buildTime={process.env.BUILD_TIME} />;
 }

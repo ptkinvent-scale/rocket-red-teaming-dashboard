@@ -1,6 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  /* config options here */
+  env: {
+    BUILD_TIME: new Date().toISOString(),
+  },
 };
 
 export default nextConfig;
