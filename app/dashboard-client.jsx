@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChevronRight, Moon, Sun } from "lucide-react";
+import { ChevronRight, Moon, Sun, User } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -200,6 +200,10 @@ function ConversationCard({ row, expanded, onToggle }) {
             <SeverityBadge severity={row.severity}>{`${row.severity}_${row.verdict}`}</SeverityBadge>
           )}
           <Badge variant="secondary">{row.category}</Badge>
+          <span className="flex items-center gap-1 text-sm text-muted-foreground whitespace-nowrap">
+            <User className="size-3.5" />
+            {row.redTeamerEmail || "—"}
+          </span>
           <span className="text-sm text-muted-foreground flex-1 min-w-[140px]">
             {row.clientName}
             {row.state ? ` · ${row.state}` : ""}
@@ -238,6 +242,7 @@ function ConversationCard({ row, expanded, onToggle }) {
               <KV k="Category" v={row.category} />
               <KV k="Subcategory" v={row.subcategory || "—"} />
               <KV k="Timestamp" v={fmtDate(row.timestamp)} />
+              <KV k="Red teamer" v={row.redTeamerEmail || "—"} />
             </div>
           </div>
 
@@ -327,12 +332,17 @@ export default function DashboardClient({ rows, buildTime }) {
   const [verdictFilter, setVerdictFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [severityFilter, setSeverityFilter] = useState("all");
+  const [redTeamerFilter, setRedTeamerFilter] = useState("all");
   const [sort, setSort] = useState("timestamp_desc");
   const [expanded, setExpanded] = useState(new Set());
 
   const uniqueVerdicts = useMemo(() => [...new Set(rows.map((r) => r.verdict))].sort(), [rows]);
   const uniqueCategories = useMemo(() => [...new Set(rows.map((r) => r.category))].sort(), [rows]);
   const uniqueSeverities = useMemo(() => [...new Set(rows.map((r) => r.severity))].sort(), [rows]);
+  const uniqueRedTeamers = useMemo(
+    () => [...new Set(rows.map((r) => r.redTeamerEmail).filter(Boolean))].sort(),
+    [rows],
+  );
 
   function countBy(key) {
     const m = new Map();
@@ -345,8 +355,18 @@ export default function DashboardClient({ rows, buildTime }) {
       if (verdictFilter !== "all" && r.verdict !== verdictFilter) return false;
       if (categoryFilter !== "all" && r.category !== categoryFilter) return false;
       if (severityFilter !== "all" && r.severity !== severityFilter) return false;
+      if (redTeamerFilter !== "all" && r.redTeamerEmail !== redTeamerFilter) return false;
       if (search) {
-        const hay = [r.trackingId, r.clientName, r.category, r.subcategory, r.clientInbound, r.generatedSms, r.comment]
+        const hay = [
+          r.trackingId,
+          r.clientName,
+          r.category,
+          r.subcategory,
+          r.clientInbound,
+          r.generatedSms,
+          r.comment,
+          r.redTeamerEmail,
+        ]
           .join(" ")
           .toLowerCase();
         if (!hay.includes(search.toLowerCase())) return false;
@@ -370,7 +390,7 @@ export default function DashboardClient({ rows, buildTime }) {
         break;
     }
     return list;
-  }, [rows, search, verdictFilter, categoryFilter, severityFilter, sort]);
+  }, [rows, search, verdictFilter, categoryFilter, severityFilter, redTeamerFilter, sort]);
 
   function toggle(id) {
     setExpanded((prev) => {
@@ -386,6 +406,7 @@ export default function DashboardClient({ rows, buildTime }) {
     setVerdictFilter("all");
     setCategoryFilter("all");
     setSeverityFilter("all");
+    setRedTeamerFilter("all");
     setSort("timestamp_desc");
   }
 
@@ -457,6 +478,12 @@ export default function DashboardClient({ rows, buildTime }) {
           onChange={setSeverityFilter}
           options={uniqueSeverities}
           allLabel="All severities"
+        />
+        <FilterSelect
+          value={redTeamerFilter}
+          onChange={setRedTeamerFilter}
+          options={uniqueRedTeamers}
+          allLabel="All red teamers"
         />
         <Select value={sort} onValueChange={setSort}>
           <SelectTrigger>
